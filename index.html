@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>水火箭自由工程模擬器-航太輕量化版</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 { color: #2c3e50; margin-bottom: 5px; }
+        p.subtitle { color: #7f8c8d; margin-top: 0; margin-bottom: 20px; text-align: center; max-width: 700px; }
+        .container {
+            display: flex;
+            gap: 20px;
+            max-width: 1100px;
+            width: 100%;
+        }
+        .control-panel {
+            flex: 1.2;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+        }
+        .simulation-panel {
+            flex: 0.8;
+            background: #e3f2fd;
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+            height: 620px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.05);
+        }
+        .input-group {
+            margin-bottom: 14px;
+            background: #fdfefe;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #eef2f3;
+        }
+        .input-group.bottle-setting {
+            background: #fff9db;
+            border: 1px solid #fab005;
+        }
+        .input-group.weight-setting {
+            background: #fff0f6;
+            border: 1px solid #ffdeeb;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #34495e;
+        }
+        input[type="range"] {
+            width: 100%;
+        }
+        .value-display {
+            float: right;
+            color: #2980b9;
+            font-weight: bold;
+        }
+        .bottle-setting .value-display { color: #f59f00; }
+        .weight-setting .value-display { color: #d6336c; }
+        
+        button {
+            width: 100%;
+            padding: 14px;
+            background-color: #e67e22;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background-color: #d35400; }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 5px solid #7f8c8d;
+        }
+        .data-line {
+            margin: 5px 0;
+            font-size: 15px;
+            color: #555;
+        }
+        .highlight-box {
+            background: #eef7ff;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 5px;
+            font-weight: bold;
+            font-size: 22px;
+            color: #e74c3c;
+            text-align: center;
+            border: 2px dashed #e74c3c;
+        }
+        /* 火箭與動畫 */
+        #rocket {
+            width: 35px;
+            height: 70px;
+            background-color: #e74c3c;
+            border-radius: 50% 50% 10% 10%;
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            transition: bottom 0.1s linear, width 0.2s, height 0.2s;
+        }
+        #rocket::before, #rocket::after {
+            content: ''; position: absolute; bottom: -5px; width: 0; height: 0;
+            border-left: 10px solid transparent; border-right: 10px solid transparent;
+            border-top: 15px solid #c0392b;
+        }
+        #rocket::before { left: -5px; }
+        #rocket::after { right: -5px; }
+        
+        .smoke {
+            position: absolute; width: 12px; height: 12px;
+            background: rgba(255, 255, 255, 0.85); border-radius: 50%;
+            animation: fadeOut 0.5s forwards;
+        }
+        @keyframes fadeOut { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(3.5); opacity: 0; } }
+        .ground { position: absolute; bottom: 0; width: 100%; height: 20px; background-color: #2d3436; }
+    </style>
+</head>
+<body>
+
+    <h1>🚀 水火箭自由工程模擬器 (航太輕量化版)</h1>
+    <p class="subtitle">真正的航太工程師必須斤斤計較！除了瓶子大小與化學燃料，火箭自身的重量（死重）更是決定能不能飛天的關鍵。試著找出兼顧燃料與輕量化的完美組合吧！</p>
+    
+    <div class="container">
+        <div class="control-panel">
+            <h3>🛠️ 實驗與工程參數設定</h3>
+            
+            <div class="input-group bottle-setting">
+                <label>🧴 寶特瓶總容量 (火箭大小): <span class="value-display" id="capacity-val">1250 mL</span></label>
+                <input type="range" id="capacity" min="500" max="2500" step="50" value="1250" oninput="updateStaticData()">
+            </div>
+
+            <div class="input-group weight-setting">
+                <label>⚖️ 火箭自身淨重 (含尾翼噴嘴): <span class="value-display" id="emptyWeight-val">50 g</span></label>
+                <input type="range" id="emptyWeight" min="20" max="500" step="5" value="50" oninput="updateStaticData()">
+            </div>
+            
+            <div class="input-group">
+                <label>⚪ 小蘇打粉 (粉末質量): <span class="value-display" id="soda-val">20 g</span></label>
+                <input type="range" id="soda" min="0" max="300" step="1" value="20" oninput="updateStaticData()">
+            </div>
+            
+            <div class="input-group">
+                <label>🧪 白醋量 (含有5%醋酸): <span class="value-display" id="vinegar-val">300 mL</span></label>
+                <input type="range" id="vinegar" min="0" max="2500" step="10" value="300" oninput="updateStaticData()">
+            </div>
+            
+            <button id="launch-btn" onclick="launchRocket()">🚀 點火發射！</button>
+
+            <div class="result">
+                <strong>📊 科學觀測數據：</strong>
+                <div class="data-line" id="info-weight">⚖️ 發射前火箭總重（含燃料）：-- g</div>
+                <div class="data-line" id="info-ratio">📈 白醋佔總容量比例：-- %</div>
+                
+                <div class="highlight-box" id="info-height">高度觀測中...</div>
+                
+                <div style="border-top: 1px solid #ddd; margin-top: 10px; padding-top: 10px;">
+                    <div class="data-line" id="info-limit">🔴 限製試劑：??</div>
+                    <div class="data-line" id="info-gas">💨 釋放二氧化碳：?? L</div>
+                    <div class="data-line" id="info-comment" style="color: #7f8c8d; font-size: 14px; margin-top: 5px;">狀態：等待火箭發射...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="simulation-panel" id="sim-screen">
+            <div id="rocket"></div>
+            <div class="ground"></div>
+        </div>
+    </div>
+
+    <script>
+        let flightResult = { maxHeight: 0, gas: 0, limit: '', comment: '' };
+
+        window.onload = function() {
+            updateStaticData();
+        };
+
+        function updateStaticData() {
+            const bottleCapacity = parseFloat(document.getElementById('capacity').value);
+            const emptyWeight = parseFloat(document.getElementById('emptyWeight').value);
+            const soda = parseFloat(document.getElementById('soda').value);
+            const vinegar = parseFloat(document.getElementById('vinegar').value);
+
+            document.getElementById('capacity-val').innerText = bottleCapacity + ' mL';
+            document.getElementById('emptyWeight-val').innerText = emptyWeight + ' g';
+            document.getElementById('soda-val').innerText = soda + ' g';
+            document.getElementById('vinegar-val').innerText = vinegar + ' mL';
+
+            // 動態縮放視覺火箭大小
+            const rocketVisual = document.getElementById('rocket');
+            let sizeScale = 0.6 + (bottleCapacity / 2500) * 0.6; 
+            rocketVisual.style.width = (35 * sizeScale) + 'px';
+            rocketVisual.style.height = (70 * sizeScale) + 'px';
+
+            // 顯示即時物理狀態（總重 = 空瓶重 + 白醋重(1mL=1g) + 小蘇打重）
+            let totalWeight = emptyWeight + vinegar + soda; 
+            let liquidRatio = Math.round((vinegar / bottleCapacity) * 100);
+            
+            document.getElementById('info-weight').innerText = `⚖️ 發射前火箭總重：${totalWeight} 克 (g)`;
+            document.getElementById('info-ratio').innerText = `📈 白醋佔總容量比例：${liquidRatio} %`;
+
+            // 後台秘密計算
+            runHiddenChemicalCalculation(bottleCapacity, emptyWeight, soda, vinegar, totalWeight, liquidRatio);
+        }
+
+function runHiddenChemicalCalculation(bottleCapacity, emptyWeight, soda, vinegar, totalWeight, liquidRatio) {
+    // 1. 氣體累積空間 (扣除液體體積)
+    let airSpace = bottleCapacity - vinegar; 
+    let maxHeight = 0;
+    let comment = "";
+    let gasProduced = 0;
+    let limitReactant = "";
+
+    // 2. 檢查基礎條件
+    if (soda === 0 || vinegar === 0) {
+        flightResult.maxHeight = 0;
+        flightResult.gas = 0;
+        flightResult.limit = (soda === 0 && vinegar === 0) ? "無反應物" : "缺漏反應物";
+        flightResult.comment = "💡 缺漏反應物！沒有化學反應，火箭並未離開發射台。";
+        return;
+    }
+
+    if (airSpace <= (bottleCapacity * 0.12)) {
+        flightResult.maxHeight = 1;
+        flightResult.gas = 0;
+        flightResult.limit = "空間不足";
+        flightResult.comment = "⚠️ 白醋加太滿了！瓶內沒有足夠空間讓二氧化碳累積氣壓，火箭太重飛不起來。";
+        return;
+    }
+
+    // 3. 化學計量計算 (修正 5% 白醋的反應比，1g 小蘇打需要 14.3ml 白醋)
+    let neededVinegarForSoda = soda * 14.3;
+
+    if (vinegar >= neededVinegarForSoda) {
+        limitReactant = "小蘇打 (白醋過剩)";
+        gasProduced = soda * 0.268; // 1g 小蘇打約產生 0.268L 二氧化碳
+    } else {
+        limitReactant = "白醋 (小蘇打過剩)";
+        let actualReactionSoda = vinegar / 14.3; // 修正反應量
+        gasProduced = actualReactionSoda * 0.268; 
+    }
+
+    // 4. 壓力過大爆炸判定
+    if (gasProduced > (bottleCapacity * 0.025)) { // 放寬臨界值提高可玩性
+        flightResult.maxHeight = 3;
+        flightResult.gas = Math.round(gasProduced * 100) / 100;
+        flightResult.limit = limitReactant;
+        flightResult.comment = "💥 反應太猛烈！在這個容量下壓力累積過快，在發射塞還沒塞好前就提早漏氣噴發了！";
+        return;
+    }
+
+    // 5. 物理引擎計算 (PSI 壓力與懲罰)
+    let pressurePsi = (gasProduced * 1000 / airSpace) * 14.7; 
+    
+    // 最佳推進介質比例 (30% 體積比最理想)
+    let optimalRatio = 30;
+    let ratioEfficiency = 1 - Math.abs(liquidRatio - optimalRatio) / 60;
+    if (ratioEfficiency < 0) ratioEfficiency = 0;
+
+    // 重量懲罰 (以 300g 為基礎死重)
+    let weightPenalty = 500 / (500 + Math.max(0, totalWeight - 300));
+    if (weightPenalty > 1.2) weightPenalty = 1.2;
+
+    // 最終高度計算 (導入您前一個提及的公式)
+    let baseScore = (pressurePsi * 2.2) * ratioEfficiency * weightPenalty;
+    maxHeight = Math.max(0, baseScore);
+
+    // 6. 評語判定
+    if (maxHeight > 55) {
+        comment = "🏆 頂尖航太工程師！你完美平衡了化學氣壓、液體介質，並成功將車體輕量化，創下歷史新高！";
+    } else if (emptyWeight >= 150) {
+        comment = "🏋️ 火箭車體太重了（死重過高）！就算化學反應很完美，沉重的機身也極大地拖累了飛行高度。";
+    } else if (liquidRatio > 50) {
+        comment = "💧 白醋裝太多了。雖然產生足夠氣體，但火箭發射時大半的能量都在推動死重的液體。";
+    } else if (liquidRatio < 15) {
+        comment = "💨 白醋太少了。缺乏反作用力的噴射介質，氣體一瞬間就漏光了。";
+    } else {
+        comment = "👍 成功發射！試著在保持白醋 30% 的同時，調低「火箭自身淨重」，觀察輕量化的威力。";
+    }
+
+    // 7. 寫入結果
+    flightResult.maxHeight = Math.round(maxHeight * 10) / 10;
+    flightResult.gas = Math.round(gasProduced * 100) / 100;
+    flightResult.limit = limitReactant;
+    flightResult.comment = comment;
+}
+
+        function launchRocket() {
+            const btn = document.getElementById('launch-btn');
+            btn.disabled = true;
+            btn.innerText = "🚀 升空中...";
+
+            document.getElementById('info-height').innerText = "🚀 升空中...";
+            document.getElementById('info-limit').innerText = "🔴 限製試劑：??";
+            document.getElementById('info-gas').innerText = "💨 釋放二氧化碳：?? L";
+            document.getElementById('info-comment').innerText = "狀態：火箭正在空中翱翔，等待著陸數據...";
+
+            const rocket = document.getElementById('rocket');
+            const screen = document.getElementById('sim-screen');
+            const maxHeight = flightResult.maxHeight;
+
+            let duration = 2500; 
+            let start = Date.now();
+            
+            document.querySelectorAll('.smoke').forEach(e => e.remove());
+
+            let timer = setInterval(function() {
+                let timePassed = Date.now() - start;
+                
+                if (timePassed >= duration) {
+                    clearInterval(timer);
+                    rocket.style.bottom = '20px'; 
+                    
+                    btn.disabled = false;
+                    btn.innerText = "🚀 點火發射！";
+
+                    // 著陸後輸出盲測結果
+                    document.getElementById('info-height').innerText = `🚀 最高高度：${maxHeight} 公尺`;
+                    document.getElementById('info-limit').innerText = `🔴 限製試劑：${flightResult.limit}`;
+                    document.getElementById('info-gas').innerText = `💨 釋放二氧化碳：${flightResult.gas} 公升 (L)`;
+                    document.getElementById('info-comment').innerText = `科學報告：${flightResult.comment}`;
+                    return;
+                }
+
+                let progress = timePassed / duration;
+                let heightEffect = Math.sin(progress * Math.PI); 
+                
+                let maxHeightPx = 520;
+                let visualMax = Math.min(maxHeightPx, maxHeight * 7);
+                let currentPos = 20 + heightEffect * visualMax;
+                
+                rocket.style.bottom = currentPos + 'px';
+                
+                if (progress < 0.4 && maxHeight > 0 && Math.random() > 0.3) {
+                    createSmoke(currentPos);
+                }
+            }, 30);
+        }
+
+        function createSmoke(rocketBottom) {
+            const screen = document.getElementById('sim-screen');
+            const smoke = document.createElement('div');
+            smoke.className = 'smoke';
+            smoke.style.bottom = (rocketBottom - 5) + 'px';
+            smoke.style.left = '50%';
+            smoke.style.transform = 'translateX(-50%)';
+            screen.appendChild(smoke);
+            setTimeout(() => smoke.remove(), 500);
+        }
+    </script>
+</body>
+</html>
